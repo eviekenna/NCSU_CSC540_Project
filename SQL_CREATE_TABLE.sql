@@ -9,8 +9,8 @@
   CREATE TABLE Product (
     product_id INT PRIMARY KEY,
     name VARCHAR(30),
-    manufacturer_id INT
-    catagory_id INT
+    manufacturer_id INT,
+    catagory_id INT,
     CONSTRAINT manufacturer_id_fk FOREIGN KEY (manufacturer_id) REFERENCES Manufacturer(manufacturer_id),
     CONSTRAINT category_id_fk FOREIGN KEY (catagory_id) REFERENCES Category(category_id)
   );
