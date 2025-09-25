@@ -12,7 +12,7 @@
     manufacturer_id INT
     catagory_id INT
     CONSTRAINT manufacturer_id_fk FOREIGN KEY (manufacturer_id) REFERENCES Manufacturer(manufacturer_id),
-    CONSTRAINT catagory_id_fk FOREIGN KEY (catagory_id) REFERENCES Category(category_id)
+    CONSTRAINT category_id_fk FOREIGN KEY (catagory_id) REFERENCES Category(category_id)
   );
     
   CREATE TABLE Recipe (
