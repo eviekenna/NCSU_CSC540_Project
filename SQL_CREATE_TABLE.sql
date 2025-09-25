@@ -23,17 +23,28 @@
     CONSTRAINT product_id_fk FOREIGN KEY (product_id) REFERENCES Product(product_id),
     CONSTRAINT ingredient_id_fk FOREIGN KEY (ingredient_id) REFERENCES Ingredient(ingredient_id)
   );
-    
+
+  
   CREATE TABLE Ingredient (
     ingredient_id INT PRIMARY KEY, 
-    ingredient_name VARCHAR(100) NOT NULL
+    ingredient_name VARCHAR(100) NOT NULL,
+    ingredient_type ENUM('compound', 'atomic') NOT NULL
   );
-    
+
+  /**  
+      Parent is the compound ingredient and child are all of the atomic ingredients that make up the compound ingredient.
+        Example: 
+          INSERT INTO Ingredient VALUES (1, 'Garlic', 'atomic'), (2, 'Tomato', 'atomic'), (3, 'Chocolate', 'atomic'), (4, 'Paprika', 'atomic'); --potential children
+          INSERT INTO Ingredient VALUES (50, 'Tomato paste', 'compound') --potential parent
+          INSERT INTO IngredientComposition VALUES (50, 1, 3), (50, 2, 9), (50, 4, 2); --adding garlic, tomato, and paprika to compound ingredient tomato paste.
+  */
   CREATE TABLE IngredientComposition (
-    ingredient_id INT 
-    ingredient_id_fk FOREIGN KEY REFERENCES Ingredient(ingredient_id),
+    parent_ingredient_id INT,
+    child_ingredient_id INT,
     quantity INT,
-    material VARCHAR(30)
+    PRIMARY KEY (parent_ingredient_id, child_ingredient_id),
+    CONSTRAINT parent_ingredient_id_fk FOREIGN KEY (parent_ingredient_id) REFERENCES Ingredient(ingredient_id),
+    CONSTRAINT child_ingredient_id_fk FOREIGN KEY (child_ingredient_id) REFERENCES Ingredient(ingredient_id)
   );
     
   CREATE TABLE Manufacturer (
@@ -59,9 +70,10 @@
   );
 
   CREATE TABLE IngredientBatch (
-    lot_number VARCHAR(100) PRIMARY KEY,
+    batch_id INT AUTO_INCREMENT,
     ingredient_id INT NOT NULL,
     supplier_id INT NOT NULL,
+    lot_number VARCHAR(100) AS CONCAT(ingredient_id, '-', supplier_id, '-', batch_id),
     quantity_oz INT NOT NULL CHECK (quantity_oz >= 0),
     cost DECIMAL(12, 2) NOT NULL CHECK (cost >= 0),
     expiration_date DATE NOT NULL,
