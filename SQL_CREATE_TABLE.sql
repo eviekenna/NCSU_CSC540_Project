@@ -19,7 +19,7 @@
     product_id INT,
     ingredient_id INT,
     quantity DECIMAL(12, 2) NOT NULL,
-    PRIMARY KEY (product_id, ingredient_id)
+    PRIMARY KEY (product_id, ingredient_id),
     CONSTRAINT product_id_fk FOREIGN KEY (product_id) REFERENCES Product(product_id),
     CONSTRAINT ingredient_id_fk FOREIGN KEY (ingredient_id) REFERENCES Ingredient(ingredient_id)
   );
