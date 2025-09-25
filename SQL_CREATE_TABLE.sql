@@ -8,9 +8,9 @@
     
   CREATE TABLE Product (
     product_id INT PRIMARY KEY,
-    name VARCHAR(30),
-    manufacturer_id INT,
-    catagory_id INT,
+    name VARCHAR(30) NOT NULL,
+    manufacturer_id INT NOT NULL,
+    category_id INT NOT NULL,
     CONSTRAINT manufacturer_id_fk FOREIGN KEY (manufacturer_id) REFERENCES Manufacturer(manufacturer_id),
     CONSTRAINT category_id_fk FOREIGN KEY (catagory_id) REFERENCES Category(category_id)
   );
@@ -78,8 +78,7 @@
     quantity_oz INT NOT NULL CHECK (quantity_oz >= 0),
     cost DECIMAL(12, 2) NOT NULL CHECK (cost >= 0),
     expiration_date DATE NOT NULL,
-    intake_date DATE NOT NULL,
-    PRIMARY KEY (batch_id),
+    intake_date DATE NOT NULL DEFAULT CURRENT_DATE,
     FOREIGN KEY (supplier_id) REFERENCES Supplier(supplier_id),
     CONSTRAINT check_90_day_minimum CHECK (DATEDIFF(expiration_date, intake_date) >= 90)
   );
