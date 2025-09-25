@@ -91,6 +91,15 @@
     FOREIGN KEY (ingredient_lot_number) REFERENCES IngredientBatch(lot_number)
   );
 
+  CREATE TABLE DoNotCombine (
+    ingredientA_id INT,
+    ingredientB_id INT,
+    PRIMARY KEY (ingrediantA_id, ingredientB_id),
+    CONSTRAINT ingredientA_id_fk FOREIGN KEY (ingredientA_id) REFERENCES Ingredient(ingredient_id),
+    CONSTRAINT ingredientB_id_fk FOREIGN KEY (ingredientB_id) REFERENCES Ingredient(ingredient_id),
+    CONSTRAINT check_reverse_dupes CHECK (ingredientA_id < ingredientB_id) -- no duplicates i.e. (vinegar & baking soda), (baking soda & vinegar)
+  );
+
 
     
   
