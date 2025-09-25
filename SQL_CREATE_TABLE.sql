@@ -53,9 +53,10 @@
   );
     
   CREATE TABLE ProductBatch (
-    lot_number VARCHAR(100) PRIMARY KEY,
+    batch_id INT AUTO_INCREMENT PRIMARY KEY,
     product_id INT NOT NULL,
     manufacturer_id INT NOT NULL,
+    lot_number VARCHAR(100) AS CONCAT(product_id, '-', manufacturer_id, '-', batch_id),
     quantity INT NOT NULL CHECK (quantity >= 0),
     cost INT NOT NULL CHECK (cost >= 0),
     production_date DATE NOT NULL DEFAULT CURRENT_DATE, --trace product for recalls
@@ -70,7 +71,7 @@
   );
 
   CREATE TABLE IngredientBatch (
-    batch_id INT AUTO_INCREMENT,
+    batch_id INT AUTO_INCREMENT PRIMARY KEY,
     ingredient_id INT NOT NULL,
     supplier_id INT NOT NULL,
     lot_number VARCHAR(100) AS CONCAT(ingredient_id, '-', supplier_id, '-', batch_id),
@@ -78,6 +79,7 @@
     cost DECIMAL(12, 2) NOT NULL CHECK (cost >= 0),
     expiration_date DATE NOT NULL,
     intake_date DATE NOT NULL,
+    PRIMARY KEY (batch_id),
     FOREIGN KEY (supplier_id) REFERENCES Supplier(supplier_id),
     CONSTRAINT check_90_day_minimum CHECK (DATEDIFF(expiration_date, intake_date) >= 90)
   );
