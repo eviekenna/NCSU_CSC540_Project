@@ -50,7 +50,7 @@
     production_date DATE NOT NULL DEFAULT CURRENT_DATE, --trace product for recalls
     expiration_date DATE NOT NULL,
     CONSTRAINT product_id_fk FOREIGN KEY (product_id) REFERENCES Product(product_id),
-    CONSTRAINT manufacturer_id_fk FOREIGN KEY (manufacturer_id) REFERENCES Manufacturer(manufacturer_id),
+    CONSTRAINT manufacturer_id_fk FOREIGN KEY (manufacturer_id) REFERENCES Manufacturer(manufacturer_id)
   );
 
   CREATE TABLE Supplier (
@@ -94,7 +94,7 @@
   CREATE TABLE DoNotCombine (
     ingredientA_id INT,
     ingredientB_id INT,
-    PRIMARY KEY (ingrediantA_id, ingredientB_id),
+    PRIMARY KEY (ingredientA_id, ingredientB_id),
     CONSTRAINT ingredientA_id_fk FOREIGN KEY (ingredientA_id) REFERENCES Ingredient(ingredient_id),
     CONSTRAINT ingredientB_id_fk FOREIGN KEY (ingredientB_id) REFERENCES Ingredient(ingredient_id),
     CONSTRAINT check_reverse_dupes CHECK (ingredientA_id < ingredientB_id) -- no duplicates i.e. (vinegar & baking soda), (baking soda & vinegar)
