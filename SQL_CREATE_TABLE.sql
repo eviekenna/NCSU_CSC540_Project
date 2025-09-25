@@ -11,49 +11,50 @@
     name VARCHAR(30),
     manufacturer_id INT
     catagory_id INT
-    FOREIGN KEY manufacturer_id_fk REFERENCES manufacturer,
-    FOREIGN KEY catagory_id_fk REFERENCES category
+    CONSTRAINT manufacturer_id_fk FOREIGN KEY (manufacturer_id) REFERENCES Manufacturer(manufacturer_id),
+    CONSTRAINT catagory_id_fk FOREIGN KEY (catagory_id) REFERENCES Category(category_id)
   );
     
   CREATE TABLE Recipe (
-    product_id INT 
-    product_id_fk FOREIGN KEY REFERENCES Product(product_id),
-    ingredient_id INT 
-    ingredient_id_fk FOREIGN KEY REFERENCES Ingredient(ingredient_id), 
-    quantity INT,
-    PRIMARY KEY (product_id,ingredient_id)
+    product_id INT,
+    ingredient_id INT,
+    quantity DECIMAL(12, 2) NOT NULL,
+    PRIMARY KEY (product_id, ingredient_id)
+    CONSTRAINT product_id_fk FOREIGN KEY (product_id) REFERENCES Product(product_id),
+    CONSTRAINT ingredient_id_fk FOREIGN KEY (ingredient_id) REFERENCES Ingredient(ingredient_id)
   );
     
   CREATE TABLE Ingredient (
     ingredient_id INT PRIMARY KEY, 
-    ingredient_name VARCHAR(30)
+    ingredient_name VARCHAR(100) NOT NULL
   );
     
   CREATE TABLE IngredientComposition (
     ingredient_id INT 
     ingredient_id_fk FOREIGN KEY REFERENCES Ingredient(ingredient_id),
     quantity INT,
-    material VARCHAR(30),
+    material VARCHAR(30)
   );
     
   CREATE TABLE Manufacturer (
     manufacturer_id INT PRIMARY KEY, 
-    manufacturer_name VARCHAR(30),
+    manufacturer_name VARCHAR(100)
   );
     
   CREATE TABLE ProductBatch (
-    lot_number INT PRIMARY KEY,
-    product_id INT,
-    manufacturer_id INT,
-    product_id_fk FOREIGN KEY REFERENCES Product(product_id),
-    manufacturer_id_fk FOREIGN KEY REFERENCES Manufacturer(manufacturer_id),
-    quantity INT, 
-    date ???????,
-    cost INT
+    lot_number VARCHAR(100) PRIMARY KEY,
+    product_id INT NOT NULL,
+    manufacturer_id INT NOT NULL,
+    quantity INT NOT NULL CHECK (quantity >= 0),
+    cost INT NOT NULL CHECK (cost >= 0),
+    production_date DATE NOT NULL DEFAULT CURRENT_DATE, --trace product for recalls
+    expiration_date DATE NOT NULL,
+    CONSTRAINT product_id_fk FOREIGN KEY (product_id) REFERENCES Product(product_id),
+    CONSTRAINT manufacturer_id_fk FOREIGN KEY (manufacturer_id) REFERENCES Manufacturer(manufacturer_id),
   );
 
   CREATE TABLE Supplier (
-    supplier_id INT PRIMARY KEY
+    supplier_id INT PRIMARY KEY,
     supplier_name VARCHAR(100) NOT NULL
   );
 
@@ -61,10 +62,10 @@
     lot_number VARCHAR(100) PRIMARY KEY,
     ingredient_id INT NOT NULL,
     supplier_id INT NOT NULL,
-    quantity_oz INT NOT NULL, -- CHECK here? make sure it is positive
-    cost DECIMAL(12, 2) NOT NULL, -- CHECK here? 
+    quantity_oz INT NOT NULL CHECK (quantity_oz >= 0),
+    cost DECIMAL(12, 2) NOT NULL CHECK (cost >= 0),
     expiration_date DATE NOT NULL,
-    intake_date DATE NOT NULL
+    intake_date DATE NOT NULL,
     FOREIGN KEY (supplier_id) REFERENCES Supplier(supplier_id),
     CONSTRAINT check_90_day_minimum CHECK (DATEDIFF(expiration_date, intake_date) >= 90)
   );
