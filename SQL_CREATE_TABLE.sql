@@ -80,6 +80,7 @@
     expiration_date DATE NOT NULL,
     intake_date DATE NOT NULL DEFAULT CURRENT_DATE,
     FOREIGN KEY (supplier_id) REFERENCES Supplier(supplier_id),
+    FOREIGN KEY (ingredient_id) REFERENCES Ingredient(ingredient_id),
     CONSTRAINT check_90_day_minimum CHECK (DATEDIFF(expiration_date, intake_date) >= 90)
   );
 
