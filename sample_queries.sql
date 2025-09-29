@@ -1,0 +1,15 @@
+--Pseudocode for future queries
+
+--Ingredient Suppliers and Prices
+SELECT ingredient_id, ingredient_name, 
+    supplier_id, supplier_name,
+    formulation_id, price_per_unit, pack_size
+FROM Ingredient, IngredientComposition,
+    Supplier, SupplierFormulation;
+
+-- Expiring Soon
+SELECT ingredient_lot_number, ingredient_id,ingredient_name,
+    supplier_id, supplier_name, expiration_date
+FROM IngredientBatch, Ingredient, Supplier
+WHERE expiration_date BETWEEN GETDATE() AND DATEADD(day, n, GETDATE())
+GROUP BY ingredient_name, supplier_name
