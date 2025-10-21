@@ -1,34 +1,49 @@
 -- !preview conn=DBI::dbConnect(RSQLite::SQLite())
 
+-- drop the tables if they exist for cleaner updates with create statements. drop children then parent.
+  DROP TABLE IF EXISTS BatchConsumption;
+  DROP TABLE IF EXISTS DoNotCombine;
+  DROP TABLE IF EXISTS SupplierFormulation;
+  DROP TABLE IF EXISTS IngredientBatch;
+  DROP TABLE IF EXISTS ProductBatch;
+  DROP TABLE IF EXISTS Recipe;
+  DROP TABLE IF EXISTS IngredientComposition;
+  DROP TABLE IF EXISTS Product;
+  DROP TABLE IF EXISTS Supplier;
+  DROP TABLE IF EXISTS Manufacturer;
+  DROP TABLE IF EXISTS Ingredient;
+  DROP TABLE IF EXISTS Category;
+
+
   CREATE TABLE Category (
-    category_id       BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    category_id       INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
     name              VARCHAR(100) NOT NULL,
     UNIQUE(name)
+  );
+
+  CREATE TABLE Ingredient (
+    ingredient_id INT PRIMARY KEY, 
+    ingredient_name VARCHAR(100) NOT NULL,
+    ingredient_type ENUM('compound', 'atomic') NOT NULL
+  );
+
+  CREATE TABLE Manufacturer (
+    manufacturer_id INT PRIMARY KEY, 
+    manufacturer_name VARCHAR(100)
+  );
+
+  CREATE TABLE Supplier (
+    supplier_id INT PRIMARY KEY,
+    supplier_name VARCHAR(100) NOT NULL
   );
     
   CREATE TABLE Product (
     product_id INT PRIMARY KEY,
     name VARCHAR(30) NOT NULL,
     manufacturer_id INT NOT NULL,
-    category_id INT NOT NULL,
+    category_id INT UNSIGNED NOT NULL,
     CONSTRAINT manufacturer_id_fk FOREIGN KEY (manufacturer_id) REFERENCES Manufacturer(manufacturer_id),
-    CONSTRAINT category_id_fk FOREIGN KEY (catagory_id) REFERENCES Category(category_id)
-  );
-    
-  CREATE TABLE Recipe (
-    product_id INT,
-    ingredient_id INT,
-    quantity DECIMAL(12, 2) NOT NULL,
-    PRIMARY KEY (product_id, ingredient_id),
-    CONSTRAINT product_id_fk FOREIGN KEY (product_id) REFERENCES Product(product_id),
-    CONSTRAINT ingredient_id_fk FOREIGN KEY (ingredient_id) REFERENCES Ingredient(ingredient_id)
-  );
-
-  
-  CREATE TABLE Ingredient (
-    ingredient_id INT PRIMARY KEY, 
-    ingredient_name VARCHAR(100) NOT NULL,
-    ingredient_type ENUM('compound', 'atomic') NOT NULL
+    CONSTRAINT category_id_fk FOREIGN KEY (category_id) REFERENCES Category(category_id)
   );
 
   /**  
@@ -47,34 +62,36 @@
     CONSTRAINT child_ingredient_id_fk FOREIGN KEY (child_ingredient_id) REFERENCES Ingredient(ingredient_id)
   );
     
-  CREATE TABLE Manufacturer (
-    manufacturer_id INT PRIMARY KEY, 
-    manufacturer_name VARCHAR(100)
+  CREATE TABLE Recipe (
+    product_id INT,
+    ingredient_id INT,
+    quantity DECIMAL(12, 2) NOT NULL,
+    PRIMARY KEY (product_id, ingredient_id),
+    CONSTRAINT product_id_fk FOREIGN KEY (product_id) REFERENCES Product(product_id),
+    CONSTRAINT ingredient_id_fk FOREIGN KEY (ingredient_id) REFERENCES Ingredient(ingredient_id)
   );
+
+    
     
   CREATE TABLE ProductBatch (
     batch_id INT AUTO_INCREMENT PRIMARY KEY,
     product_id INT NOT NULL,
     manufacturer_id INT NOT NULL,
-    lot_number VARCHAR(100) AS CONCAT(product_id, '-', manufacturer_id, '-', batch_id),
+    lot_number VARCHAR(100) AS (CONCAT(product_id, '-', manufacturer_id, '-', batch_id)) STORED,
     quantity INT NOT NULL CHECK (quantity >= 0),
     cost INT NOT NULL CHECK (cost >= 0),
-    production_date DATE NOT NULL DEFAULT CURRENT_DATE, --trace product for recalls
+    production_date DATE NOT NULL DEFAULT CURRENT_DATE, -- trace product for recalls
     expiration_date DATE NOT NULL,
     CONSTRAINT product_id_fk FOREIGN KEY (product_id) REFERENCES Product(product_id),
     CONSTRAINT manufacturer_id_fk FOREIGN KEY (manufacturer_id) REFERENCES Manufacturer(manufacturer_id)
   );
 
-  CREATE TABLE Supplier (
-    supplier_id INT PRIMARY KEY,
-    supplier_name VARCHAR(100) NOT NULL
-  );
 
   CREATE TABLE IngredientBatch (
     batch_id INT AUTO_INCREMENT PRIMARY KEY,
     ingredient_id INT NOT NULL,
     supplier_id INT NOT NULL,
-    lot_number VARCHAR(100) AS CONCAT(ingredient_id, '-', supplier_id, '-', batch_id),
+    lot_number VARCHAR(100) AS (CONCAT(ingredient_id, '-', supplier_id, '-', batch_id)) STORED,
     quantity_oz INT NOT NULL CHECK (quantity_oz >= 0),
     cost DECIMAL(12, 2) NOT NULL CHECK (cost >= 0),
     expiration_date DATE NOT NULL,
