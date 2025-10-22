@@ -18,29 +18,29 @@
 
 
   CREATE TABLE Category (
-    category_id       INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    category_id       INT UNSIGNED PRIMARY KEY,
     name              VARCHAR(100) NOT NULL,
     UNIQUE(name)
   );
 
   CREATE TABLE Ingredient (
-    ingredient_id INT AUTO_INCREMENT PRIMARY KEY, 
+    ingredient_id INT PRIMARY KEY, 
     ingredient_name VARCHAR(100) NOT NULL,
     ingredient_type ENUM('compound', 'atomic') NOT NULL
   );
 
   CREATE TABLE Manufacturer (
-    manufacturer_id INT AUTO_INCREMENT PRIMARY KEY, 
+    manufacturer_id INT PRIMARY KEY, 
     manufacturer_name VARCHAR(100)
   );
 
   CREATE TABLE Supplier (
-    supplier_id INT AUTO_INCREMENT PRIMARY KEY,
+    supplier_id INT PRIMARY KEY,
     supplier_name VARCHAR(100) NOT NULL
   );
     
   CREATE TABLE Product (
-    product_id INT AUTO_INCREMENT PRIMARY KEY,
+    product_id INT PRIMARY KEY,
     name VARCHAR(30) NOT NULL,
     manufacturer_id INT NOT NULL,
     category_id INT UNSIGNED NOT NULL,
@@ -104,7 +104,7 @@
   );
 
   CREATE TABLE SupplierFormulation (
-    formulation_id INT PRIMARY KEY AUTO_INCREMENT,
+    formulation_id INT AUTO_INCREMENT PRIMARY KEY,
     supplier_id INT NOT NULL,
     ingredient_id INT NOT NULL,
     pack_size INT NOT NULL CHECK (pack_size > 0),
