@@ -109,7 +109,7 @@
     supplier_id VARCHAR(100) NOT NULL,
     lot_number VARCHAR(100) UNIQUE,
     quantity_oz DECIMAL(10, 2) NOT NULL CHECK (quantity_oz >= 0),
-    available_oz DECIMAL(10, 2) NOT NULL CHECK (available_oz >= 0),
+    on_hand_oz DECIMAL(10, 2) NOT NULL CHECK (on_hand_oz >= 0),
     unit_cost DECIMAL(10, 2) NOT NULL CHECK (unit_cost >= 0),
     expiration_date DATE NOT NULL,
     intake_date DATE NOT NULL DEFAULT CURRENT_DATE,
@@ -166,7 +166,7 @@
   );
 
 
-  /* Triggers */
+  -- Triggers 
   
   /**
   	batch_id has not been generated yet but we need it for the lot_number so we trigger a lookup to see what the next autoincremented batch id number will be so we can calculate the lot number
@@ -199,16 +199,64 @@
       SET NEW.lot_number = CONCAT(NEW.ingredient_id, '-', NEW.supplier_id, '-', next_id);
   END//
 
+  -- prevent expired consumption
+  CREATE TRIGGER prevent_expired_consumption
+  BEFORE INSERT ON BatchConsumption
+  FOR EACH ROW
+  BEGIN
+      DECLARE lot_expiration_date DATE; -- local variable
+    
+      -- get expiration date of the ingredient lot
+      SELECT expiration_date INTO lot_expiration_date
+      FROM IngredientBatch
+      WHERE lot_number = NEW.ingredient_lot_number; -- ingredient lot number from new row
+    
+      -- check if expired
+      IF lot_expiration_date < NOW() THEN
+          SIGNAL SQLSTATE '45000' -- raise error
+          SET MESSAGE_TEXT = 'You should not consume an expired ingredient lot.';
+      END IF;
+  END//
+  
+  
+  -- initialize the on hand available oz to the quantity oz when a new ingredient batch is received
+  CREATE TRIGGER initialize_on_hand_oz
+  BEFORE INSERT ON IngredientBatch
+  FOR EACH ROW
+  BEGIN
+      -- on_hand_oz equal to quantity_oz with new batch
+      SET NEW.on_hand_oz = NEW.quantity_oz;
+  END//
+  
+  -- decrement on_hand_oz when consumed
+  CREATE TRIGGER update_on_hand_after_consumption
+  AFTER INSERT ON BatchConsumption
+  FOR EACH ROW
+  BEGIN
+      -- decrement on_hand_oz on consumption
+      UPDATE IngredientBatch
+      SET on_hand_oz = available_oz - NEW.quantity_consumed
+      WHERE lot_number = NEW.ingredient_lot_number;
+    
+      -- make sure on_hand_oz is not negative after consumption
+      IF (SELECT on_hand_oz FROM IngredientBatch WHERE lot_number = NEW.ingredient_lot_number) < 0 THEN
+          SIGNAL SQLSTATE '45000'
+          SET MESSAGE_TEXT = 'Not enough of ingredient in lot for consumption.';
+      END IF;
+  
+  
+  
+
   DELIMITER ; -- // -> ;
   
   
   
-  
-  
+  -- Procedures
   
   
   
   
   
   /* Populate tables with Insert */
+  
   
