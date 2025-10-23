@@ -197,10 +197,14 @@
   FOR EACH ROW
   BEGIN
       DECLARE next_id INT;
+
+      -- query to select the latest autoincrement value and store in next_id
       SELECT AUTO_INCREMENT INTO next_id
       FROM information_schema.TABLES
       WHERE TABLE_SCHEMA = DATABASE()
       AND TABLE_NAME = 'IngredientBatch';
+
+      -- set the lot number
       SET NEW.lot_number = CONCAT(NEW.ingredient_id, '-', NEW.supplier_id, '-', next_id);
   END//
 
