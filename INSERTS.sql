@@ -52,7 +52,6 @@
   -- SUP020 version 1 of Seasoning Blend
   INSERT INTO SupplierFormulation (supplier_id, ingredient_id, version_no, pack_size, price_per_unit, effective_period_start_date, effective_period_end_date)
   VALUES ('SUP020', 201, 1, 8.0, 2.5, '2025-01-01', '2025-06-30');
-  -- formulation_id = 1
 
   -- SUP020 formulation
   INSERT INTO SupplierFormulationMaterials VALUES (1, 101, 6.0);
