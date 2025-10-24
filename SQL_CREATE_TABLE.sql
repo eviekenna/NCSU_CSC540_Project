@@ -408,6 +408,23 @@
       -- no conflicts found, return message of no health risks
       SELECT 'No health risks detected.' AS health_risk;
   END// 
+
+    -- Suggestion to replace Recipe table with 2 new tables (RecipePlan and RecipeIngredient) to allow for version tracking of recipes. CREATE TABLE RecipePlan (
+-- CREATE TABLE RecipePlan (
+ --   plan_id INT AUTO_INCREMENT PRIMARY KEY,  
+  --  product_id INT NOT NULL,
+    --manufacturer_id VARCHAR(100) NOT NULL,
+    --version_no INT NOT NULL,
+    --creation_date DATE NOT NULL DEFAULT CURRENT_DATE,
+   -- UNIQUE(product_id, version_no)
+
+ --   CREATE TABLE RecipeIngredient (
+   -- plan_id INT,
+   -- ingredient_id INT,
+   -- quantity DECIMAL(10, 2) NOT NULL,
+   -- PRIMARY KEY (plan_id, ingredient_id)
+
+
   
   DELIMITER ; -- // -> ;
   
