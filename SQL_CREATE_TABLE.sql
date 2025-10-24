@@ -409,7 +409,7 @@
       SELECT 'No health risks detected.' AS health_risk;
   END// 
 
-    -- Suggestion to replace Recipe table with 2 new tables (RecipePlan and RecipeIngredient) to allow for version tracking of recipes. CREATE TABLE RecipePlan (
+    -- Suggestion to replace Recipe table with 2 new tables (RecipePlan and RecipeIngredient) to allow for version tracking of recipes.
 -- CREATE TABLE RecipePlan (
  --   plan_id INT AUTO_INCREMENT PRIMARY KEY,  
   --  product_id INT NOT NULL,
