@@ -4,12 +4,17 @@
   USE wlcarte2; -- change to your user id
 
   DROP TABLE IF EXISTS BatchConsumption;
+
+  DROP TABLE IF EXISTS ProductBatch;
+  DROP TABLE IF EXISTS IngredientBatch;
+
+
   DROP TABLE IF EXISTS DoNotCombine;
   DROP TABLE IF EXISTS SupplierFormulationMaterials;
+  DROP TABLE IF EXISTS RecipeIngredient;
   DROP TABLE IF EXISTS SupplierFormulation;
-  DROP TABLE IF EXISTS IngredientBatch;
-  DROP TABLE IF EXISTS ProductBatch;
   DROP TABLE IF EXISTS Recipe;
+  DROP TABLE IF EXISTS RecipePlan;
   DROP TABLE IF EXISTS IngredientComposition;
   DROP TABLE IF EXISTS Product;
   DROP TABLE IF EXISTS Supplier;
@@ -77,15 +82,38 @@
     CONSTRAINT parent_notequal_child CHECK (parent_ingredient_id != child_ingredient_id)
   );
     
-  -- product BOM 
-  CREATE TABLE Recipe (
-    product_id INT,
+--   -- product BOM 
+--   CREATE TABLE Recipe (
+--     product_id INT,
+--     ingredient_id INT,
+--     quantity DECIMAL(10, 2) NOT NULL,
+--     PRIMARY KEY (product_id, ingredient_id),
+--     CONSTRAINT recipe_product_id_fk FOREIGN KEY (product_id) REFERENCES Product(product_id),
+--     CONSTRAINT recipe_ingredient_id_fk FOREIGN KEY (ingredient_id) REFERENCES Ingredient(ingredient_id)
+--   );
+
+    -- Suggestion to replace Recipe table with 2 new tables (RecipePlan and RecipeIngredient) to allow for version tracking of recipes.
+  CREATE TABLE RecipePlan (
+    plan_id INT AUTO_INCREMENT PRIMARY KEY,  
+    product_id INT NOT NULL,
+    manufacturer_id VARCHAR(100) NOT NULL,
+    version_no INT NOT NULL,
+    creation_date DATE NOT NULL DEFAULT CURRENT_DATE,
+    is_active BOOLEAN NOT NULL DEFAULT FALSE,
+    UNIQUE(product_id, manufacturer_id, version_no),
+    CONSTRAINT rp_product_id_fk FOREIGN KEY (product_id) REFERENCES Product(product_id) ON DELETE CASCADE,
+    CONSTRAINT rp_manufacturer_id_fk FOREIGN KEY (manufacturer_id) REFERENCES Manufacturer(manufacturer_id) ON DELETE CASCADE
+    );
+
+  CREATE TABLE RecipeIngredient (
+    plan_id INT,
     ingredient_id INT,
-    quantity DECIMAL(10, 2) NOT NULL,
-    PRIMARY KEY (product_id, ingredient_id),
-    CONSTRAINT recipe_product_id_fk FOREIGN KEY (product_id) REFERENCES Product(product_id),
-    CONSTRAINT recipe_ingredient_id_fk FOREIGN KEY (ingredient_id) REFERENCES Ingredient(ingredient_id)
-  );
+    quantity DECIMAL(10, 2) NOT NULL CHECK (quantity > 0),
+    PRIMARY KEY (plan_id, ingredient_id),
+    CONSTRAINT ri_plan_id_fk FOREIGN KEY (plan_id) REFERENCES RecipePlan(plan_id) ON DELETE CASCADE,
+    CONSTRAINT ri_ingredient_id_fk FOREIGN KEY (ingredient_id) REFERENCES Ingredient(ingredient_id) ON DELETE CASCADE
+    );
+
 
     
     
@@ -98,8 +126,10 @@
     unit_cost DECIMAL(10, 2) NOT NULL CHECK (unit_cost >= 0),
     production_date DATE NOT NULL DEFAULT CURRENT_DATE, -- trace product for recalls
     expiration_date DATE NOT NULL,
-    CONSTRAINT batch_product_id_fk FOREIGN KEY (product_id) REFERENCES Product(product_id),
-    CONSTRAINT batch_manufacturer_id_fk FOREIGN KEY (manufacturer_id) REFERENCES Manufacturer(manufacturer_id)
+    plan_id INT,
+    CONSTRAINT pbatch_product_id_fk FOREIGN KEY (product_id) REFERENCES Product(product_id),
+    CONSTRAINT pbatch_manufacturer_id_fk FOREIGN KEY (manufacturer_id) REFERENCES Manufacturer(manufacturer_id),
+    CONSTRAINT pbatch_plan_id_fk FOREIGN KEY (plan_id) REFERENCES RecipePlan(plan_id) ON DELETE SET NULL
   );
 
 
@@ -113,8 +143,8 @@
     unit_cost DECIMAL(10, 2) NOT NULL CHECK (unit_cost >= 0),
     expiration_date DATE NOT NULL,
     intake_date DATE NOT NULL DEFAULT CURRENT_DATE,
-    CONSTRAINT batch_supplier_id_fk FOREIGN KEY (supplier_id) REFERENCES Supplier(supplier_id),
-    CONSTRAINT batch_ingredient_id_fk FOREIGN KEY (ingredient_id) REFERENCES Ingredient(ingredient_id),
+    CONSTRAINT ibatch_supplier_id_fk FOREIGN KEY (supplier_id) REFERENCES Supplier(supplier_id),
+    CONSTRAINT ibatch_ingredient_id_fk FOREIGN KEY (ingredient_id) REFERENCES Ingredient(ingredient_id),
     CONSTRAINT check_90_day_minimum CHECK (DATEDIFF(expiration_date, intake_date) >= 90)
   );
 
@@ -172,6 +202,8 @@
   DROP TRIGGER IF EXISTS prevent_expired_consumption;
   DROP TRIGGER IF EXISTS initialize_on_hand_oz; 
   DROP TRIGGER IF EXISTS update_on_hand_after_consumption;
+--   DROP TRIGGER IF EXISTS update_single_active_version;
+--   DROP TRIGGER IF EXISTS insert_single_active_version;
   
   /**
   	batch_id has not been generated yet but we need it for the lot_number so we trigger a lookup to see what the next autoincremented batch id number will be so we can calculate the lot number
@@ -253,6 +285,36 @@
       END IF;
   END//
   
+--   -- should only have 1 active version of recipe so we know which recipe to use
+--   CREATE TRIGGER insert_single_active_version -- new version is the active one
+--   AFTER INSERT ON RecipePlan
+--   FOR EACH ROW
+--   BEGIN
+--       IF NEW.is_active = TRUE THEN
+--           -- all other plans should be false
+--           UPDATE RecipePlan
+--           SET is_active = FALSE
+--           WHERE product_id = NEW.product_id
+--           AND manufacturer_id = NEW.manufacturer_id
+--           AND plan_id != NEW.plan_id;
+--       END IF;
+--   END//
+--   
+--   CREATE TRIGGER update_single_active_version 
+--   BEFORE UPDATE ON RecipePlan
+--   FOR EACH ROW
+--   BEGIN
+--       -- old recipe plan becomes active, all others are not active
+--       IF NEW.is_active = TRUE AND OLD.is_active = FALSE THEN
+--           -- all other recipe plans should not be active
+--           UPDATE RecipePlan
+--           SET is_active = FALSE
+--           WHERE product_id = NEW.product_id
+--           AND manufacturer_id = NEW.manufacturer_id
+--           AND plan_id != new.plan_id;
+--       END IF;
+--   END//
+  
   
   -- Stored Procedures
   DROP PROCEDURE IF EXISTS record_production_batch;
@@ -269,7 +331,8 @@
     IN p_manufacturer_id VARCHAR(100),
     IN p_quantity INT,
     IN p_expiration_date DATE,
-    IN p_ingredient_lots JSON -- [{"lot_number": "8-SUP001-1", "quantity": 100.0}, {...}, {...}]
+    IN p_ingredient_lots JSON, -- [{"lot_number": "8-SUP001-1", "quantity": 100.0}, {...}, {...}]
+    IN p_plan_id INT
   )
   BEGIN
       DECLARE local_total_cost DECIMAL(10, 2) DEFAULT 0.0; -- total cost of all ingredients starts at 0
@@ -281,12 +344,22 @@
       DECLARE local_current_qty DECIMAL(10, 2); -- how much of current ingredient used
       DECLARE local_ingredient_cost DECIMAL(10, 2); -- cost per oz of curr ingredient
     
+      -- make sure plan version exists for product
+      IF NOT EXISTS (
+          SELECT * FROM RecipePlan
+          WHERE plan_id = p_plan_id
+          AND product_id = p_product_id
+          AND manufacturer_id = p_manufacturer_id
+      ) THEN 
+          SIGNAL SQLSTATE '45000'
+          SET MESSAGE_TEXT = 'Invald plan_id';
+      END IF;
       -- atomicity
       START TRANSACTION;
     
       -- create product batch tuple
-      INSERT INTO ProductBatch (product_id, manufacturer_id, quantity, unit_cost, expiration_date) -- batch_id is autoincremented and lot_number is generated by trigger
-      VALUES (p_product_id, p_manufacturer_id, p_quantity, 0.0, p_expiration_date); -- unit cost will be calculated, default 0
+      INSERT INTO ProductBatch (product_id, manufacturer_id, quantity, unit_cost, expiration_date, plan_id) -- batch_id is autoincremented and lot_number is generated by trigger
+      VALUES (p_product_id, p_manufacturer_id, p_quantity, 0.0, p_expiration_date, p_plan_id); -- unit cost will be calculated, default 0
     
       -- get generated lot number
       SET local_product_lot = (SELECT lot_number FROM ProductBatch WHERE batch_id = LAST_INSERT_ID()); -- get latest autoincremented value which is batch_id and filter by that, select the lot_number and set it to local product lot
@@ -409,20 +482,8 @@
       SELECT 'No health risks detected.' AS health_risk;
   END// 
 
-    -- Suggestion to replace Recipe table with 2 new tables (RecipePlan and RecipeIngredient) to allow for version tracking of recipes.
--- CREATE TABLE RecipePlan (
- --   plan_id INT AUTO_INCREMENT PRIMARY KEY,  
-  --  product_id INT NOT NULL,
-    --manufacturer_id VARCHAR(100) NOT NULL,
-    --version_no INT NOT NULL,
-    --creation_date DATE NOT NULL DEFAULT CURRENT_DATE,
-   -- UNIQUE(product_id, version_no)
-
- --   CREATE TABLE RecipeIngredient (
-   -- plan_id INT,
-   -- ingredient_id INT,
-   -- quantity DECIMAL(10, 2) NOT NULL,
-   -- PRIMARY KEY (plan_id, ingredient_id)
+  
+  DELIMITER ; -- // -> ;
 
 
   
