@@ -38,12 +38,32 @@
   INSERT INTO Product VALUES (100, 'Steak Dinner', 'MFG001', 2, 500);
   INSERT INTO Product VALUES (101, 'Mac & Cheese', 'MFG002', 3, 300);
 
-  -- insert Recipes (product BOM)
-  INSERT INTO Recipe VALUES (100, 106, 6.0);   -- Steak Dinner calls for 6oz Beef Steak
-  INSERT INTO Recipe VALUES (100, 201, 0.2);   -- Steak Dinner calls for 0.2oz Seasoning Blend
-  INSERT INTO Recipe VALUES (101, 108, 7.0);   -- Mac & Cheese calls for 7oz Pasta
-  INSERT INTO Recipe VALUES (101, 101, 0.5);   -- Mac & Cheese calls for 0.5oz Salt
-  INSERT INTO Recipe VALUES (101, 102, 2.0);   -- Mac & Cheese calls for 2oz Pepper
+--   -- insert Recipes (product BOM)
+--   INSERT INTO Recipe VALUES (100, 106, 6.0);   -- Steak Dinner calls for 6oz Beef Steak
+--   INSERT INTO Recipe VALUES (100, 201, 0.2);   -- Steak Dinner calls for 0.2oz Seasoning Blend
+--   INSERT INTO Recipe VALUES (101, 108, 7.0);   -- Mac & Cheese calls for 7oz Pasta
+--   INSERT INTO Recipe VALUES (101, 101, 0.5);   -- Mac & Cheese calls for 0.5oz Salt
+--   INSERT INTO Recipe VALUES (101, 102, 2.0);   -- Mac & Cheese calls for 2oz Pepper
+
+  -- Steak Dinner recipe plan version1
+  INSERT INTO RecipePlan (product_id, manufacturer_id, version_no, is_active)
+  VALUES (100, 'MFG001', 1, TRUE);
+
+  SET @steak_plan_id = LAST_INSERT_ID();
+
+  INSERT INTO RecipeIngredient VALUES (@steak_plan_id, 106, 6.0);   -- Beef
+  INSERT INTO RecipeIngredient VALUES (@steak_plan_id, 201, 0.2);   -- Seasoning Blend
+  
+  -- Mac & Cheese recipe plan version1
+  INSERT INTO RecipePlan (product_id, manufacturer_id, version_no, is_active)
+  VALUES (101, 'MFG002', 1, TRUE);
+
+  SET @mac_plan_id = LAST_INSERT_ID();
+
+  INSERT INTO RecipeIngredient VALUES (@mac_plan_id, 108, 7.0);   -- Pasta
+  INSERT INTO RecipeIngredient VALUES (@mac_plan_id, 101, 0.5);   -- Salt
+  INSERT INTO RecipeIngredient VALUES (@mac_plan_id, 102, 2.0);   -- Pepper
+
 
   -- seasoning blend
   INSERT INTO IngredientComposition VALUES (201, 101, 6.0);  -- Seasoning Blend has Salt
@@ -52,6 +72,7 @@
   -- SUP020 version 1 of Seasoning Blend
   INSERT INTO SupplierFormulation (supplier_id, ingredient_id, version_no, pack_size, price_per_unit, effective_period_start_date, effective_period_end_date)
   VALUES ('SUP020', 201, 1, 8.0, 2.5, '2025-01-01', '2025-06-30');
+  -- formulation_id = 1
 
   -- SUP020 formulation
   INSERT INTO SupplierFormulationMaterials VALUES (1, 101, 6.0);
@@ -115,6 +136,8 @@
   -- call the record_production_batch procedure to create product batches and batch consumption records
 
   -- product Bbatch 1: Steak Dinner 100 units
+  -- get the active plan for Steak Dinner
+  SET @steak_dinner_plan = (SELECT plan_id FROM RecipePlan WHERE product_id = 100 AND is_active = TRUE);
   CALL record_production_batch(
       100,                    -- product_id: Steak Dinner
       'MFG001',              -- manufacturer_id
@@ -123,10 +146,13 @@
       '[
           {"lot_number": "106-SUP020-7", "quantity": 600.0},
           {"lot_number": "201-SUP020-11", "quantity": 20.0}
-      ]'
+      ]',
+      @steak_dinner_plan
   );
 
   -- product batch 2: Mac & Cheese 300 units
+  -- get the active plan for Mac & Cheese
+  SET @mac_and_cheese_plan = (SELECT plan_id FROM RecipePlan WHERE product_id = 101 AND is_active = TRUE);
   CALL record_production_batch(
       101,                    -- product_id: Mac & Cheese
       'MFG002',              -- manufacturer_id
@@ -136,6 +162,7 @@
           {"lot_number": "101-SUP020-3", "quantity": 150.0},
           {"lot_number": "108-SUP020-9", "quantity": 2100.0},
           {"lot_number": "102-SUP020-5", "quantity": 600.0}
-      ]'
+      ]',
+      @mac_and_cheese_plan
   );
   
