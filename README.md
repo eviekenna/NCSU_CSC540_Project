@@ -19,4 +19,4 @@ The design includes:
 - Triggers and stored procedures for enforcing business logic  
 - Application-level login and role-based access
 
-See the report (`CSC540_Database_Design_Report.pdf`) and ER diagram (`Final ER Diagram.pdf`) for full documentation.
+See the report (`CSC_540_Database_Design_Report(1).pdf`) and ER diagram (`Final ER Diagram.pdf`) for full documentation.
