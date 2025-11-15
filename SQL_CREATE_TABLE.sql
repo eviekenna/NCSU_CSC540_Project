@@ -117,16 +117,31 @@
 
     
     
+--   CREATE TABLE ProductBatch (
+--     batch_id INT AUTO_INCREMENT PRIMARY KEY,
+--     product_id INT NOT NULL,
+--     manufacturer_id VARCHAR(100) NOT NULL,
+--     lot_number VARCHAR(100) UNIQUE,
+--     quantity INT NOT NULL CHECK (quantity >= 0),
+--     unit_cost DECIMAL(10, 2) NOT NULL CHECK (unit_cost >= 0),
+--     production_date DATE NOT NULL DEFAULT CURRENT_DATE, -- trace product for recalls
+--     expiration_date DATE NOT NULL,
+--     plan_id INT,
+--     CONSTRAINT pbatch_product_id_fk FOREIGN KEY (product_id) REFERENCES Product(product_id),
+--     CONSTRAINT pbatch_manufacturer_id_fk FOREIGN KEY (manufacturer_id) REFERENCES Manufacturer(manufacturer_id),
+--     CONSTRAINT pbatch_plan_id_fk FOREIGN KEY (plan_id) REFERENCES RecipePlan(plan_id) ON DELETE SET NULL
+--   );
   CREATE TABLE ProductBatch (
-    batch_id INT AUTO_INCREMENT PRIMARY KEY,
+    batch_id VARCHAR(20) NOT NULL,
     product_id INT NOT NULL,
     manufacturer_id VARCHAR(100) NOT NULL,
-    lot_number VARCHAR(100) UNIQUE,
+    lot_number VARCHAR(100) NOT NULL UNIQUE, 
     quantity INT NOT NULL CHECK (quantity >= 0),
     unit_cost DECIMAL(10, 2) NOT NULL CHECK (unit_cost >= 0),
     production_date DATE NOT NULL DEFAULT CURRENT_DATE, -- trace product for recalls
     expiration_date DATE NOT NULL,
     plan_id INT,
+    PRIMARY KEY (product_id, manufacturer_id, batch_id),
     CONSTRAINT pbatch_product_id_fk FOREIGN KEY (product_id) REFERENCES Product(product_id),
     CONSTRAINT pbatch_manufacturer_id_fk FOREIGN KEY (manufacturer_id) REFERENCES Manufacturer(manufacturer_id),
     CONSTRAINT pbatch_plan_id_fk FOREIGN KEY (plan_id) REFERENCES RecipePlan(plan_id) ON DELETE SET NULL
@@ -134,7 +149,7 @@
 
 
   CREATE TABLE IngredientBatch (
-    batch_id INT AUTO_INCREMENT PRIMARY KEY,
+    batch_id VARCHAR(20) NOT NULL,
     ingredient_id INT NOT NULL,
     supplier_id VARCHAR(100) NOT NULL,
     lot_number VARCHAR(100) UNIQUE,
@@ -143,6 +158,7 @@
     unit_cost DECIMAL(10, 2) NOT NULL CHECK (unit_cost >= 0),
     expiration_date DATE NOT NULL,
     intake_date DATE NOT NULL DEFAULT CURRENT_DATE,
+    PRIMARY KEY (ingredient_id, supplier_id, batch_id),
     CONSTRAINT ibatch_supplier_id_fk FOREIGN KEY (supplier_id) REFERENCES Supplier(supplier_id),
     CONSTRAINT ibatch_ingredient_id_fk FOREIGN KEY (ingredient_id) REFERENCES Ingredient(ingredient_id),
     CONSTRAINT check_90_day_minimum CHECK (DATEDIFF(expiration_date, intake_date) >= 90)
@@ -197,7 +213,7 @@
 
 
   -- Triggers
-  DROP TRIGGER IF EXISTS generate_product_lot_number;
+  -- DROP TRIGGER IF EXISTS generate_product_lot_number;
   DROP TRIGGER IF EXISTS generate_ingredient_lot_number; 
   DROP TRIGGER IF EXISTS prevent_expired_consumption;
   DROP TRIGGER IF EXISTS initialize_on_hand_oz; 
@@ -211,52 +227,42 @@
   DELIMITER // -- ; -> //
 
   -- product lot number
-  CREATE TRIGGER generate_product_lot_number
-  BEFORE INSERT ON ProductBatch
-  FOR EACH ROW
-  BEGIN
-      DECLARE next_id INT; -- store the next autoincrement value
-      SELECT AUTO_INCREMENT INTO next_id -- select the autoincrement val
-      FROM information_schema.TABLES -- from system table
-      WHERE TABLE_SCHEMA = DATABASE() -- current database
-      AND TABLE_NAME = 'ProductBatch'; -- product batch table
-      SET NEW.lot_number = CONCAT(NEW.product_id, '-', NEW.manufacturer_id, '-', next_id); -- create the lot number
-  END//
+--   CREATE TRIGGER generate_product_lot_number
+--   BEFORE INSERT ON ProductBatch
+--   FOR EACH ROW
+--   BEGIN
+--       DECLARE next_id INT; -- store the next autoincrement value
+--       SELECT AUTO_INCREMENT INTO next_id -- select the autoincrement val
+--       FROM information_schema.TABLES -- from system table
+--       WHERE TABLE_SCHEMA = DATABASE() -- current database
+--       AND TABLE_NAME = 'ProductBatch'; -- product batch table
+--       SET NEW.lot_number = CONCAT(NEW.product_id, '-', NEW.manufacturer_id, '-', next_id); -- create the lot number
+--   END//
   
   -- ingredient lot number
+--   CREATE TRIGGER generate_ingredient_lot_number
+--   BEFORE INSERT ON IngredientBatch
+--   FOR EACH ROW
+--   BEGIN
+--       DECLARE next_id INT;
+
+--       -- query to select the latest autoincrement value and store in next_id
+--       SELECT AUTO_INCREMENT INTO next_id
+--       FROM information_schema.TABLES
+--       WHERE TABLE_SCHEMA = DATABASE()
+--       AND TABLE_NAME = 'IngredientBatch';
+
+--       -- set the lot number
+--       SET NEW.lot_number = CONCAT(NEW.ingredient_id, '-', NEW.supplier_id, '-', next_id);
+--   END//
+
+  -- prevent expired consumption
   CREATE TRIGGER generate_ingredient_lot_number
   BEFORE INSERT ON IngredientBatch
   FOR EACH ROW
   BEGIN
-      DECLARE next_id INT;
-
-      -- query to select the latest autoincrement value and store in next_id
-      SELECT AUTO_INCREMENT INTO next_id
-      FROM information_schema.TABLES
-      WHERE TABLE_SCHEMA = DATABASE()
-      AND TABLE_NAME = 'IngredientBatch';
-
-      -- set the lot number
-      SET NEW.lot_number = CONCAT(NEW.ingredient_id, '-', NEW.supplier_id, '-', next_id);
-  END//
-
-  -- prevent expired consumption
-  CREATE TRIGGER prevent_expired_consumption
-  BEFORE INSERT ON BatchConsumption
-  FOR EACH ROW
-  BEGIN
-      DECLARE lot_expiration_date DATE; -- local variable
-    
-      -- get expiration date of the ingredient lot
-      SELECT expiration_date INTO lot_expiration_date
-      FROM IngredientBatch
-      WHERE lot_number = NEW.ingredient_lot_number; -- ingredient lot number from new row
-    
-      -- check if expired
-      IF NOW() > lot_expiration_date THEN
-          SIGNAL SQLSTATE '45000' -- raise error
-          SET MESSAGE_TEXT = 'You should not consume an expired ingredient lot.';
-      END IF;
+      -- use the manually provided batch_id to build lot_number
+	  SET NEW.lot_number = CONCAT(NEW.ingredient_id, '-', NEW.supplier_id, '-', NEW.batch_id);
   END//
   
   -- initialize the on hand available oz to the quantity oz when a new ingredient batch is received
@@ -332,7 +338,8 @@
     IN p_quantity INT,
     IN p_expiration_date DATE,
     IN p_ingredient_lots JSON, -- [{"lot_number": "8-SUP001-1", "quantity": 100.0}, {...}, {...}]
-    IN p_plan_id INT
+    IN p_plan_id INT,
+    IN p_batch_id VARCHAR(20)
   )
   BEGIN
       DECLARE local_total_cost DECIMAL(10, 2) DEFAULT 0.0; -- total cost of all ingredients starts at 0
@@ -343,6 +350,8 @@
       DECLARE local_current_lot VARCHAR(100); -- current ingredient lot being processed
       DECLARE local_current_qty DECIMAL(10, 2); -- how much of current ingredient used
       DECLARE local_ingredient_cost DECIMAL(10, 2); -- cost per oz of curr ingredient
+      
+      SET local_product_lot = CONCAT(p_product_id, '-', p_manufacturer_id, '-', p_batch_id);
     
       -- make sure plan version exists for product
       IF NOT EXISTS (
@@ -358,11 +367,8 @@
       START TRANSACTION;
     
       -- create product batch tuple
-      INSERT INTO ProductBatch (product_id, manufacturer_id, quantity, unit_cost, expiration_date, plan_id) -- batch_id is autoincremented and lot_number is generated by trigger
-      VALUES (p_product_id, p_manufacturer_id, p_quantity, 0.0, p_expiration_date, p_plan_id); -- unit cost will be calculated, default 0
-    
-      -- get generated lot number
-      SET local_product_lot = (SELECT lot_number FROM ProductBatch WHERE batch_id = LAST_INSERT_ID()); -- get latest autoincremented value which is batch_id and filter by that, select the lot_number and set it to local product lot
+      INSERT INTO ProductBatch (batch_id, lot_number, product_id, manufacturer_id, quantity, unit_cost, expiration_date, plan_id)
+      VALUES (p_batch_id, local_product_lot, p_product_id, p_manufacturer_id, p_quantity, 0.0, p_expiration_date, p_plan_id); -- unit cost will be calculated, default 0
     
       -- get count of ingredient lots to know how many runs in loop
       SET local_lot_count = JSON_LENGTH(p_ingredient_lots);
@@ -484,6 +490,100 @@
 
   
   DELIMITER ; -- // -> ;
+  
+  DROP VIEW IF EXISTS current_active_supplier_formulations;
+  DROP VIEW IF EXISTS flattened_product_bom;
+  DROP VIEW IF EXISTS health_risk_violations_last_30_days;
+  
+  -- current active supplier formulations
+  CREATE VIEW current_active_supplier_formulations AS
+  SELECT 
+      sf.formulation_id,
+      sf.supplier_id,
+      s.supplier_name,
+      sf.ingredient_id,
+      i.ingredient_name,
+      i.ingredient_type,
+      sf.version_no,
+      sf.pack_size,
+      sf.price_per_unit,
+      sf.effective_period_start_date,
+      sf.effective_period_end_date
+  FROM SupplierFormulation sf
+  JOIN Supplier s ON sf.supplier_id = s.supplier_id
+  JOIN Ingredient i ON sf.ingredient_id = i.ingredient_id
+  WHERE CURDATE() BETWEEN sf.effective_period_start_date 
+      AND COALESCE(sf.effective_period_end_date, '9999-12-31');
+
+
+
+
+
+  -- flattened bom view
+  CREATE VIEW flattened_product_bom AS
+  SELECT 
+      rp.plan_id,
+      rp.product_id,
+      p.name AS product_name,
+      rp.manufacturer_id,
+      m.manufacturer_name,
+      rp.version_no,
+      rp.is_active,
+      -- show both compound and atomic ingredients
+      ri.ingredient_id AS bom_ingredient_id,
+      i.ingredient_name AS bom_ingredient_name,
+      i.ingredient_type AS bom_ingredient_type,
+      ri.quantity AS bom_quantity,
+      -- for atomic: show itself; for compound: show child
+      COALESCE(ic.child_ingredient_id, ri.ingredient_id) AS atomic_ingredient_id,
+      COALESCE(ai.ingredient_name, i.ingredient_name) AS atomic_ingredient_name,
+      -- calculate atomic quantity (if compound, distribute proportionally)
+      CASE 
+          WHEN i.ingredient_type = 'atomic' THEN ri.quantity
+          ELSE ri.quantity * ic.quantity / 
+             (SELECT SUM(quantity) FROM IngredientComposition WHERE parent_ingredient_id = i.ingredient_id)
+      END AS atomic_quantity_oz
+  FROM RecipePlan rp
+  JOIN Product p ON rp.product_id = p.product_id
+  JOIN Manufacturer m ON rp.manufacturer_id = m.manufacturer_id
+  JOIN RecipeIngredient ri ON rp.plan_id = ri.plan_id
+  JOIN Ingredient i ON ri.ingredient_id = i.ingredient_id
+  LEFT JOIN IngredientComposition ic ON i.ingredient_id = ic.parent_ingredient_id AND i.ingredient_type = 'compound'
+  LEFT JOIN Ingredient ai ON ic.child_ingredient_id = ai.ingredient_id;
+
+
+
+
+
+
+
+  -- health risk violation view
+  CREATE VIEW health_risk_violations_last_30_days AS
+  SELECT DISTINCT
+      pb.lot_number AS product_lot_number,
+      pb.product_id,
+      p.name AS product_name,
+      pb.manufacturer_id,
+      pb.production_date,
+      dnc.ingredientA_id,
+      ia.ingredient_name AS ingredientA_name,
+      dnc.ingredientB_id,
+      ib.ingredient_name AS ingredientB_name,
+    'Incompatible ingredients detected' AS violation_type
+  FROM ProductBatch pb
+  JOIN Product p ON pb.product_id = p.product_id
+  JOIN BatchConsumption bc1 ON pb.lot_number = bc1.product_lot_number
+  JOIN IngredientBatch ib1 ON bc1.ingredient_lot_number = ib1.lot_number
+  JOIN BatchConsumption bc2 ON pb.lot_number = bc2.product_lot_number
+  JOIN IngredientBatch ib2 ON bc2.ingredient_lot_number = ib2.lot_number
+  JOIN DoNotCombine dnc ON (
+      (ib1.ingredient_id = dnc.ingredientA_id AND ib2.ingredient_id = dnc.ingredientB_id) OR
+      (ib1.ingredient_id = dnc.ingredientB_id AND ib2.ingredient_id = dnc.ingredientA_id)
+  )
+  JOIN Ingredient ia ON dnc.ingredientA_id = ia.ingredient_id
+  JOIN Ingredient ib ON dnc.ingredientB_id = ib.ingredient_id
+  WHERE pb.production_date >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)
+    AND bc1.ingredient_lot_number < bc2.ingredient_lot_number; -- avoid duplicates
 
 
   
